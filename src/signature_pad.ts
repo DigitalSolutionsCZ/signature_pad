@@ -215,7 +215,6 @@ export default class SignaturePad {
 
     points.forEach(function (item: any) {
       ctr = 0;
-      console.log(item);
       keys.forEach(function (key) {
         if (ctr > 0) result += columnDelimiter;
 
@@ -294,6 +293,7 @@ export default class SignaturePad {
   private _handleMouseDown = (event: MouseEvent): void => {
     if (event.which === 1) {
       this._drawningStroke = true;
+      this._strokeBegin(event);
       this._strokeBegin(event);
     }
   };

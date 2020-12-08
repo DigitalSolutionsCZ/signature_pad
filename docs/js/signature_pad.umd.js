@@ -146,6 +146,7 @@
                 if (event.which === 1) {
                     _this._drawningStroke = true;
                     _this._strokeBegin(event);
+                    _this._strokeBegin(event);
                 }
             };
             this._handleMouseMove = function (event) {
@@ -318,7 +319,6 @@
             result += lineDelimiter;
             points.forEach(function (item) {
                 ctr = 0;
-                console.log(item);
                 keys.forEach(function (key) {
                     if (ctr > 0)
                         result += columnDelimiter;
@@ -408,6 +408,9 @@
                 ? point.distanceTo(lastPoint) <= this.minDistance
                 : false;
             var color = lastPointGroup.color;
+            console.log(this.minDistance);
+            console.log(lastPoint);
+            console.log(!lastPoint || !(lastPoint && isLastPointTooClose));
             if (!lastPoint || !(lastPoint && isLastPointTooClose)) {
                 var curve = this._addPoint(point);
                 if (!lastPoint) {

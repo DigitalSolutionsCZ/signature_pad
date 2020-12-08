@@ -12,6 +12,7 @@ var signaturePad = new SignaturePad(canvas, {
   // this option can be omitted if only saving as PNG or SVG
   backgroundColor: 'rgb(255, 255, 255)',
   throttle:0,
+  minDistance:0,
 });
 
 // Adjust canvas coordinate space taking into account pixel ratio,
