@@ -273,9 +273,7 @@ export default class SignaturePad {
         /*
         * x - position x axe (mm) - min: -32768  max: 32767
         * y - position y axe (mm) - min: -32768  max: 32767
-        * dt - s - min:0 max: 65535
-        * vx - s - min: -32768  max: 32767
-        * vy - s - min: -32768  max: 32767
+        * t - s - min:0 max: 65535
         *  p - (pressure F) (N - newton) , min:0 max: 65535
         * */
         const isoPoint = {
