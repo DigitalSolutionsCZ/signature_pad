@@ -146,7 +146,6 @@
                 if (event.which === 1) {
                     _this._drawningStroke = true;
                     _this._strokeBegin(event);
-                    _this._strokeBegin(event);
                 }
             };
             this._handleMouseMove = function (event) {
@@ -319,6 +318,7 @@
             result += lineDelimiter;
             points.forEach(function (item) {
                 ctr = 0;
+                console.log(item);
                 keys.forEach(function (key) {
                     if (ctr > 0)
                         result += columnDelimiter;
@@ -361,16 +361,16 @@
             var initX = 0;
             var initY = 0;
             for (var i = 0, length_1 = this._data.length; i < length_1; i++) {
-                for (var j = 0, innerLength = this._data[i].points.length; j < innerLength; j++) {
-                    var point = this._data[i].points[j];
+                for (var j = 0, innerLength = this._data[i].allPoints.length; j < innerLength; j++) {
+                    var point = this._data[i].allPoints[j];
                     var isFirstPoint = (i === 0 && j === 0);
                     if (isFirstPoint) {
                         initX = point.x;
                         initY = point.y;
                     }
                     var isoPoint = {
-                        x: (isFirstPoint) ? 0 : Math.round(((point.x - initX) * 25.4) / (96 * dpi)),
-                        y: (isFirstPoint) ? 0 : Math.round(((initY - point.y) * 25.4) / (96 * dpi)),
+                        x: (isFirstPoint) ? 0 : (((point.x - initX) * 25.4) / (96 * dpi)),
+                        y: (isFirstPoint) ? 0 : (((initY - point.y) * 25.4) / (96 * dpi)),
                         t: (isFirstPoint) ? 0 : point.time - firstPointTime,
                         p: Math.round(point.p * 65535)
                     };
@@ -383,7 +383,8 @@
         SignaturePad.prototype._strokeBegin = function (event) {
             var newPointGroup = {
                 color: this.penColor,
-                points: []
+                points: [],
+                allPoints: []
             };
             if (typeof this.onBegin === 'function') {
                 this.onBegin(event);
@@ -393,39 +394,52 @@
             this._strokeUpdate(event);
         };
         SignaturePad.prototype._strokeUpdate = function (event) {
+            var _this = this;
             if (this._data.length === 0) {
                 this._strokeBegin(event);
                 return;
             }
-            var x = event.clientX;
-            var y = event.clientY;
-            var p = event.pressure !== undefined ? event.pressure : event.force !== undefined ? event.force : 0;
-            var point = this._createPoint(x, y, p);
-            var lastPointGroup = this._data[this._data.length - 1];
-            var lastPoints = lastPointGroup.points;
-            var lastPoint = lastPoints.length > 0 && lastPoints[lastPoints.length - 1];
-            var isLastPointTooClose = lastPoint
-                ? point.distanceTo(lastPoint) <= this.minDistance
-                : false;
-            var color = lastPointGroup.color;
-            console.log(this.minDistance);
-            console.log(lastPoint);
-            console.log(!lastPoint || !(lastPoint && isLastPointTooClose));
-            if (!lastPoint || !(lastPoint && isLastPointTooClose)) {
-                var curve = this._addPoint(point);
-                if (!lastPoint) {
-                    this._drawDot({ color: color, point: point });
-                }
-                else if (curve) {
-                    this._drawCurve({ color: color, curve: curve });
-                }
-                lastPoints.push({
+            var savePoints = function (event, isCoalescedPoints) {
+                var x = event.clientX;
+                var y = event.clientY;
+                var p = event.pressure !== undefined ? event.pressure : event.force !== undefined ? event.force : 0;
+                var point = _this._createPoint(x, y, p);
+                var lastPointGroup = _this._data[_this._data.length - 1];
+                var lastPoints = lastPointGroup.points;
+                var lastAllPoints = lastPointGroup.allPoints;
+                var lastPoint = lastPoints.length > 0 && lastPoints[lastPoints.length - 1];
+                var color = lastPointGroup.color;
+                var dataPoint = {
                     time: point.time,
                     x: point.x,
                     y: point.y,
                     p: point.p
-                });
+                };
+                if (!isCoalescedPoints) {
+                    var isLastPointTooClose = lastPoint
+                        ? point.distanceTo(lastPoint) <= _this.minDistance
+                        : false;
+                    if (!lastPoint || !(lastPoint && isLastPointTooClose)) {
+                        var curve = _this._addPoint(point);
+                        if (!lastPoint) {
+                            _this._drawDot({ color: color, point: point });
+                        }
+                        else if (curve) {
+                            _this._drawCurve({ color: color, curve: curve });
+                        }
+                        lastPoints.push(dataPoint);
+                    }
+                }
+                lastAllPoints.push(dataPoint);
+            };
+            if (event.getCoalescedEvents) {
+                var events = event.getCoalescedEvents();
+                for (var _i = 0, events_1 = events; _i < events_1.length; _i++) {
+                    var event_1 = events_1[_i];
+                    savePoints(event_1, true);
+                }
             }
+            savePoints(event, false);
         };
         SignaturePad.prototype._strokeEnd = function (event) {
             this._strokeUpdate(event);

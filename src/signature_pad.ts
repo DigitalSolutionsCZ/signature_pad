@@ -9,9 +9,9 @@
  * http://www.lemoda.net/maths/bezier-length/index.html
  */
 
-import {Bezier} from './bezier';
-import {BasicPoint, Point} from './point';
-import {throttle} from './throttle';
+import { Bezier } from './bezier';
+import { BasicPoint, Point } from './point';
+import { throttle } from './throttle';
 
 declare global {
   // tslint:disable-next-line:interface-name
@@ -36,6 +36,7 @@ export interface Options {
 export interface PointGroup {
   color: string;
   points: BasicPoint[];
+  allPoints: BasicPoint[];
 }
 
 export default class SignaturePad {
@@ -47,6 +48,7 @@ export default class SignaturePad {
   public backgroundColor: string;
   public penColor: string;
   public throttle: number;
+
   public velocityFilterWeight: number;
   public onBegin?: (event: MouseEvent | Touch) => void;
   public onEnd?: (event: MouseEvent | Touch) => void;
@@ -61,7 +63,6 @@ export default class SignaturePad {
   private _lastVelocity: number;
   private _lastWidth: number;
   private _strokeMoveUpdate: (event: MouseEvent | Touch) => void;
-
   /* tslint:enable: variable-name */
 
   constructor(
@@ -215,6 +216,7 @@ export default class SignaturePad {
 
     points.forEach(function (item: any) {
       ctr = 0;
+      console.log(item);
       keys.forEach(function (key) {
         if (ctr > 0) result += columnDelimiter;
 
@@ -262,8 +264,8 @@ export default class SignaturePad {
     let initX = 0;
     let initY = 0;
     for (let i = 0, length = this._data.length; i < length; i++) {
-      for (let j = 0, innerLength = this._data[i].points.length; j < innerLength; j++) {
-        const point = this._data[i].points[j];
+      for (let j = 0, innerLength = this._data[i].allPoints.length; j < innerLength; j++) {
+        const point = this._data[i].allPoints[j];
         const isFirstPoint = (i === 0 && j === 0);
         if (isFirstPoint) {
           initX = point.x;
@@ -272,14 +274,17 @@ export default class SignaturePad {
         /*
         * x - position x axe (mm) - min: -32768  max: 32767
         * y - position y axe (mm) - min: -32768  max: 32767
+        * dt - s - min:0 max: 65535
+        * vx - s - min: -32768  max: 32767
+        * vy - s - min: -32768  max: 32767
         * t - s - min:0 max: 65535
-        *  p - (pressure F) (N - newton) , min:0 max: 65535
+        * p - (pressure F) (N - newton) , min:0 max: 65535
         * */
         const isoPoint = {
-          x: (isFirstPoint) ? 0 : Math.round(((point.x - initX) * 25.4) / (96 * dpi)), //  1px = (25.4 / 96) mm
-          y: (isFirstPoint) ? 0 : Math.round(((initY - point.y) * 25.4) / (96 * dpi)),
+          x: (isFirstPoint) ? 0 : (((point.x - initX) * 25.4) / (96 * dpi)), //  1px = (25.4 / 96) mm
+          y: (isFirstPoint) ? 0 : (((initY - point.y) * 25.4) / (96 * dpi)),
           t: (isFirstPoint) ? 0 : point.time - firstPointTime,
-          p: Math.round(point.p * 65535) // 65535 is maximum possible value
+          p: Math.round(point.p * 65535), // 65535 is maximum possible value,
         };
         isoData.points.push(isoPoint);
         previousPoint = point;
@@ -293,7 +298,6 @@ export default class SignaturePad {
   private _handleMouseDown = (event: MouseEvent): void => {
     if (event.which === 1) {
       this._drawningStroke = true;
-      this._strokeBegin(event);
       this._strokeBegin(event);
     }
   };
@@ -324,7 +328,6 @@ export default class SignaturePad {
   private _handleTouchMove = (event: TouchEvent): void => {
     // Prevent scrolling.
     event.preventDefault();
-
     const touch = event.targetTouches[0];
     this._strokeMoveUpdate(touch);
   };
@@ -366,6 +369,7 @@ export default class SignaturePad {
     const newPointGroup = {
       color: this.penColor,
       points: [],
+      allPoints: [],
     };
 
     if (typeof this.onBegin === 'function') {
@@ -377,45 +381,58 @@ export default class SignaturePad {
     this._strokeUpdate(event);
   }
 
-  private _strokeUpdate(event: MouseEvent | Touch): void {
+  private _strokeUpdate(event: any): void {
     if (this._data.length === 0) {
       // This can happen if clear() was called while a signature is still in progress,
       // or if there is a race condition between start/update events.
       this._strokeBegin(event)
       return
     }
+    const savePoints = (event: any, isCoalescedPoints: boolean) => {
+      const x = event.clientX;
+      const y = event.clientY;
+      const p = (event as PointerEvent).pressure !== undefined ? (event as PointerEvent).pressure : (event as Touch).force !== undefined ? (event as Touch).force : 0;
 
-    const x = event.clientX;
-    const y = event.clientY;
-    const p = (event as PointerEvent).pressure !== undefined ? (event as PointerEvent).pressure : (event as Touch).force !== undefined ? (event as Touch).force : 0;
+      const point = this._createPoint(x, y, p);
+      const lastPointGroup = this._data[this._data.length - 1];
 
-    const point = this._createPoint(x, y, p);
-    const lastPointGroup = this._data[this._data.length - 1];
-    const lastPoints = lastPointGroup.points;
-    const lastPoint =
-      lastPoints.length > 0 && lastPoints[lastPoints.length - 1];
-    const isLastPointTooClose = lastPoint
-      ? point.distanceTo(lastPoint) <= this.minDistance
-      : false;
-    const color = lastPointGroup.color;
+      const lastPoints = lastPointGroup.points;
+      const lastAllPoints = lastPointGroup.allPoints;
+      const lastPoint =
+        lastPoints.length > 0 && lastPoints[lastPoints.length - 1];
 
-    // Skip this point if it's too close to the previous one
-    if (!lastPoint || !(lastPoint && isLastPointTooClose)) {
-      const curve = this._addPoint(point);
-
-      if (!lastPoint) {
-        this._drawDot({color, point});
-      } else if (curve) {
-        this._drawCurve({color, curve});
-      }
-
-      lastPoints.push({
+      const color = lastPointGroup.color;
+      const dataPoint = {
         time: point.time,
         x: point.x,
         y: point.y,
         p: point.p
-      });
+      };
+      if (!isCoalescedPoints) {
+        const isLastPointTooClose = lastPoint
+          ? point.distanceTo(lastPoint) <= this.minDistance
+          : false;
+        // Skip this point if it's too close to the previous one
+        if (!lastPoint || !(lastPoint && isLastPointTooClose)) {
+          const curve = this._addPoint(point);
+
+          if (!lastPoint) {
+            this._drawDot({ color, point });
+          } else if (curve) {
+            this._drawCurve({ color, curve });
+          }
+          lastPoints.push(dataPoint);
+        }
+      }
+      lastAllPoints.push(dataPoint)
     }
+    if (event.getCoalescedEvents) {
+      const events = event.getCoalescedEvents();
+      for (const event of events) {
+        savePoints(event, true);
+      }
+    }
+    savePoints(event, false)
   }
 
   private _strokeEnd(event: MouseEvent | Touch): void {
