@@ -3,15 +3,24 @@ export interface BasicPoint {
   x: number;
   y: number;
   p: number;
+  tx: number;
+  ty: number;
+  r: number;
   time: number;
 }
 
 export class Point implements BasicPoint {
   public p: number;
   public time: number;
-  
-  constructor(public x: number, public y: number, p?: number, time?: number) {
+  tx: number;
+  ty: number;
+  r: number;
+
+  constructor(public x: number, public y: number, p?: number, tx?: number, ty?: number, r?: number, time?: number) {
     this.p = p || 0;
+    this.tx = tx ?? 0;
+    this.ty = ty ?? 0;
+    this.r = r ?? 0;
     this.time = time || Date.now();
   }
 

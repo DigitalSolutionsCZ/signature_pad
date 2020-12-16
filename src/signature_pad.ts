@@ -279,12 +279,18 @@ export default class SignaturePad {
         * vy - s - min: -32768  max: 32767
         * t - s - min:0 max: 65535
         * p - (pressure F) (N - newton) , min:0 max: 65535
+        * tx - (tiltX) (angle), min:-90 max: 90
+        * ty - (tiltY) (angle), min:-90 max: 90
+        * r - (rotation) (angle), min:0 max: 359
         * */
         const isoPoint = {
           x: (isFirstPoint) ? 0 : (((point.x - initX) * 25.4) / (96 * dpi)), //  1px = (25.4 / 96) mm
           y: (isFirstPoint) ? 0 : (((initY - point.y) * 25.4) / (96 * dpi)),
           t: (isFirstPoint) ? 0 : point.time - firstPointTime,
           p: Math.round(point.p * 65535), // 65535 is maximum possible value,
+          tx: point.tx,
+          ty: point.ty,
+          r: point.r,
         };
         isoData.points.push(isoPoint);
         previousPoint = point;
@@ -391,9 +397,17 @@ export default class SignaturePad {
     const savePoints = (event: any, isCoalescedPoints: boolean) => {
       const x = event.clientX;
       const y = event.clientY;
-      const p = (event as PointerEvent).pressure !== undefined ? (event as PointerEvent).pressure : (event as Touch).force !== undefined ? (event as Touch).force : 0;
-
-      const point = this._createPoint(x, y, p);
+      const pointerEvent = event as PointerEvent;
+      const p = pointerEvent.pressure !== undefined ? pointerEvent.pressure : (event as Touch).force !== undefined ? (event as Touch).force : 0;
+      let tx = 0;
+      let ty = 0;
+      let r = 0;
+      if (event instanceof PointerEvent && pointerEvent.pointerType !== 'mouse') {
+        tx = pointerEvent.tiltX;
+        ty = pointerEvent.tiltY;
+        r = pointerEvent.twist;
+      }
+      const point = this._createPoint(x, y, p, tx, ty, r);
       const lastPointGroup = this._data[this._data.length - 1];
 
       const lastPoints = lastPointGroup.points;
@@ -406,7 +420,10 @@ export default class SignaturePad {
         time: point.time,
         x: point.x,
         y: point.y,
-        p: point.p
+        p: point.p,
+        tx: point.tx,
+        ty: point.ty,
+        r: point.r,
       };
       if (!isCoalescedPoints) {
         const isLastPointTooClose = lastPoint
@@ -473,10 +490,10 @@ export default class SignaturePad {
     this._ctx.fillStyle = this.penColor;
   }
 
-  private _createPoint(x: number, y: number, p: number): Point {
+  private _createPoint(x: number, y: number, p: number, tx: number, ty: number, r: number): Point {
     const rect = this.canvas.getBoundingClientRect();
 
-    return new Point(x - rect.left, y - rect.top, p, new Date().getTime());
+    return new Point(x - rect.left, y - rect.top, p, tx, ty, r, new Date().getTime());
   }
 
   // Add point to _lastPoints array and generate a new curve if there are enough points (i.e. 3)

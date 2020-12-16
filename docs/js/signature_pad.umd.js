@@ -10,10 +10,13 @@
 }(this, (function () { 'use strict';
 
     var Point = (function () {
-        function Point(x, y, p, time) {
+        function Point(x, y, p, tx, ty, r, time) {
             this.x = x;
             this.y = y;
             this.p = p || 0;
+            this.tx = tx !== null && tx !== void 0 ? tx : 0;
+            this.ty = ty !== null && ty !== void 0 ? ty : 0;
+            this.r = r !== null && r !== void 0 ? r : 0;
             this.time = time || Date.now();
         }
         Point.prototype.distanceTo = function (start) {
@@ -372,7 +375,10 @@
                         x: (isFirstPoint) ? 0 : (((point.x - initX) * 25.4) / (96 * dpi)),
                         y: (isFirstPoint) ? 0 : (((initY - point.y) * 25.4) / (96 * dpi)),
                         t: (isFirstPoint) ? 0 : point.time - firstPointTime,
-                        p: Math.round(point.p * 65535)
+                        p: Math.round(point.p * 65535),
+                        tx: point.tx,
+                        ty: point.ty,
+                        r: point.r
                     };
                     isoData.points.push(isoPoint);
                     previousPoint = point;
@@ -402,8 +408,17 @@
             var savePoints = function (event, isCoalescedPoints) {
                 var x = event.clientX;
                 var y = event.clientY;
-                var p = event.pressure !== undefined ? event.pressure : event.force !== undefined ? event.force : 0;
-                var point = _this._createPoint(x, y, p);
+                var pointerEvent = event;
+                var p = pointerEvent.pressure !== undefined ? pointerEvent.pressure : event.force !== undefined ? event.force : 0;
+                var tx = 0;
+                var ty = 0;
+                var r = 0;
+                if (event instanceof PointerEvent && pointerEvent.pointerType !== 'mouse') {
+                    tx = pointerEvent.tiltX;
+                    ty = pointerEvent.tiltY;
+                    r = pointerEvent.twist;
+                }
+                var point = _this._createPoint(x, y, p, tx, ty, r);
                 var lastPointGroup = _this._data[_this._data.length - 1];
                 var lastPoints = lastPointGroup.points;
                 var lastAllPoints = lastPointGroup.allPoints;
@@ -413,7 +428,10 @@
                     time: point.time,
                     x: point.x,
                     y: point.y,
-                    p: point.p
+                    p: point.p,
+                    tx: point.tx,
+                    ty: point.ty,
+                    r: point.r
                 };
                 if (!isCoalescedPoints) {
                     var isLastPointTooClose = lastPoint
@@ -470,9 +488,9 @@
             this._lastWidth = (this.minWidth + this.maxWidth) / 2;
             this._ctx.fillStyle = this.penColor;
         };
-        SignaturePad.prototype._createPoint = function (x, y, p) {
+        SignaturePad.prototype._createPoint = function (x, y, p, tx, ty, r) {
             var rect = this.canvas.getBoundingClientRect();
-            return new Point(x - rect.left, y - rect.top, p, new Date().getTime());
+            return new Point(x - rect.left, y - rect.top, p, tx, ty, r, new Date().getTime());
         };
         SignaturePad.prototype._addPoint = function (point) {
             var _lastPoints = this._lastPoints;
